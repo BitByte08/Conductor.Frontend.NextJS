@@ -56,7 +56,7 @@ export default function ModsPage() {
         try {
             await api.post(`/api/agent/${agentId}/mods/toggle`, { filename: entry.name, enabled: nextEnabled });
             await fetchInstalled();
-        } catch (err: unknown) {
+        } catch (error: unknown) {
             setError("토글 실패");
         } finally {
             setUpdating(null);
@@ -70,7 +70,7 @@ export default function ModsPage() {
         try {
             await api.post(`/api/agent/${agentId}/mods/delete`, { filename: entry.name });
             await fetchInstalled();
-        } catch (err: unknown) {
+        } catch (error: unknown) {
             setError("삭제 실패");
         } finally {
             setUpdating(null);

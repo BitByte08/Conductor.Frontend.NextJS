@@ -65,7 +65,7 @@ export default function DashboardPage() {
                                 <label className="text-sm text-slate-400">서버 이름</label>
                                 <input className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-700" placeholder="예: 내 서버" value={name} onChange={(e) => setName(e.target.value)} />
                             </div>
-                            <div className="text-xs text-slate-500">생성 후 서버 상세 페이지에서 유형/버전을 선택해 설치하세요.</div>
+                            <div className="text-xs text-slate-500">생성만 진행합니다. 설치는 상세 페이지에서 에이전트 연결 후 진행하세요.</div>
                             <div className="flex justify-end gap-2">
                                 <button type="button" onClick={() => setShowCreate(false)} className="px-4 py-2 rounded bg-slate-800">취소</button>
                                 <button type="submit" className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500">생성</button>
