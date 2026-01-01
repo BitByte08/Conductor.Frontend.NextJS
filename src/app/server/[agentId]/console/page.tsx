@@ -39,7 +39,7 @@ export default function ConsolePage() {
                 </div>
             </div>
 
-            <div className="min-h-[400px] bg-slate-900 border border-slate-800 rounded p-3 font-mono text-sm whitespace-pre-wrap">
+            <div className="bg-slate-900 border border-slate-800 rounded p-3 font-mono text-sm whitespace-pre-wrap max-h-[70vh] min-h-[360px] overflow-y-auto">
                 {messages.length === 0 ? (
                     <div className="text-slate-500">Waiting for logs...</div>
                 ) : (

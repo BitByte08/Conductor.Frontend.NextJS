@@ -34,6 +34,11 @@ export default function ModsPage() {
         return "vanilla";
     }, [metadata]);
 
+    const mcVersion = useMemo(() => {
+        const match = (metadata || "").match(/\d+\.\d+(?:\.\d+)?/);
+        return match ? match[0] : "";
+    }, [metadata]);
+
     const label = serverType === "paper" ? "플러그인" : "모드";
     const fetchInstalled = useCallback(async () => {
         try {
@@ -89,31 +94,69 @@ export default function ModsPage() {
         }
     };
 
-    const resolveModrinthDownload = async (mod: ModSearchHit) => {
+    const resolveModrinthDownload = async (mod: ModSearchHit, targetLoader: string, targetMcVersion: string) => {
         const projectId = mod.project_id || mod.projectId || mod.id || mod.slug;
         if (!projectId) throw new Error("프로젝트 ID를 찾을 수 없습니다");
 
-        // Step 1: pick version id
-        let versionId = mod.latest_version || mod.latestVersion;
-        if (!versionId && mod.versions && mod.versions.length > 0) {
-            versionId = mod.versions[0];
-        }
-        if (!versionId) {
+        const loaderCandidates = targetLoader === "fabric"
+            ? ["fabric"]
+            : targetLoader === "paper"
+            ? ["paper", "bukkit", "spigot"]
+            : [];
+
+        const versionIds: string[] = [];
+        if (mod.latest_version) versionIds.push(mod.latest_version);
+        if (mod.latestVersion) versionIds.push(mod.latestVersion);
+        if (mod.versions && mod.versions.length > 0) versionIds.push(...mod.versions);
+
+        if (versionIds.length === 0) {
             const projectResp = await fetch(`https://api.modrinth.com/v2/project/${projectId}`);
             if (!projectResp.ok) throw new Error("프로젝트 정보를 불러오지 못했습니다");
             const projectData = await projectResp.json() as unknown;
-            if (typeof projectData === "object" && projectData !== null) {
-                const pd = projectData as { latest_version?: string; versions?: string[] };
-                versionId = pd.latest_version || (pd.versions && pd.versions[0]);
+            if (typeof projectData === "object" && projectData !== null && "versions" in projectData) {
+                const pd = projectData as { versions?: string[] };
+                if (pd.versions && pd.versions.length > 0) {
+                    versionIds.push(...pd.versions);
+                }
             }
         }
-        if (!versionId) throw new Error("버전 정보를 찾을 수 없습니다");
 
-        // Step 2: get version files
-        const versionResp = await fetch(`https://api.modrinth.com/v2/version/${versionId}`);
-        if (!versionResp.ok) throw new Error("버전 정보를 불러오지 못했습니다");
-        const versionData = await versionResp.json() as unknown;
-        const files = (typeof versionData === "object" && versionData !== null && "files" in versionData ? (versionData as { files?: Array<{ primary?: boolean; url?: string; filename?: string }> }).files : []) || [];
+        if (versionIds.length === 0) throw new Error("버전 정보를 찾을 수 없습니다");
+
+        const seen = new Set<string>();
+        const orderedIds = versionIds.filter((v) => {
+            if (seen.has(v)) return false;
+            seen.add(v);
+            return true;
+        });
+
+        const fetchVersionData = async (versionId: string) => {
+            const versionResp = await fetch(`https://api.modrinth.com/v2/version/${versionId}`);
+            if (!versionResp.ok) throw new Error("버전 정보를 불러오지 못했습니다");
+            return versionResp.json() as unknown;
+        };
+
+        const versionMatches = (data: any) => {
+            const loaders = Array.isArray(data?.loaders) ? data.loaders : [];
+            const games = Array.isArray(data?.game_versions) ? data.game_versions : [];
+            const loaderOk = loaderCandidates.length === 0 || loaders.some((l: string) => loaderCandidates.includes(l));
+            const versionOk = !targetMcVersion || games.includes(targetMcVersion);
+            return loaderOk && versionOk;
+        };
+
+        let chosen: { files?: Array<{ primary?: boolean; url?: string; filename?: string }> } | null = null;
+        for (const vid of orderedIds) {
+            const data = await fetchVersionData(vid);
+            if (versionMatches(data)) {
+                chosen = data as { files?: Array<{ primary?: boolean; url?: string; filename?: string }> };
+                break;
+            }
+            if (!chosen) {
+                chosen = data as { files?: Array<{ primary?: boolean; url?: string; filename?: string }> };
+            }
+        }
+
+        const files = (chosen?.files || []) as Array<{ primary?: boolean; url?: string; filename?: string }>;
         const primary = files.find((f) => f?.primary) || files[0];
         if (!primary || !primary.url || !primary.filename) throw new Error("다운로드 파일이 없습니다");
         return { url: primary.url, filename: primary.filename };
@@ -123,7 +166,7 @@ export default function ModsPage() {
         setInstalling(mod.project_id || mod.slug || mod.title || "unknown");
         setError("");
         try {
-            const { url, filename } = await resolveModrinthDownload(mod);
+            const { url, filename } = await resolveModrinthDownload(mod, serverType, mcVersion);
             await api.post(`/api/agent/${agentId}/mods`, { url, filename });
             alert("설치 요청 완료. 서버를 재시작하세요.");
         } catch (error: unknown) {
