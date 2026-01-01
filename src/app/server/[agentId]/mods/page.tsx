@@ -39,6 +39,9 @@ export default function ModsPage() {
         return match ? match[0] : "";
     }, [metadata]);
 
+    const [selectedLoader, setSelectedLoader] = useState<string>("");
+    const [selectedVersion, setSelectedVersion] = useState<string>("");
+
     const label = serverType === "paper" ? "플러그인" : "모드";
     const fetchInstalled = useCallback(async () => {
         try {
@@ -157,12 +160,13 @@ export default function ModsPage() {
                 chosen = data;
                 break;
             }
-            if (!chosen) {
-                chosen = data;
-            }
         }
 
-        const files = chosen?.files || [];
+        if (!chosen) {
+            throw new Error(`플랫폼(${targetLoader}) 및 버전(${targetMcVersion || "미지정"})에 맞는 파일을 찾지 못했습니다`);
+        }
+
+        const files = chosen.files || [];
         const primary = files.find((f) => f?.primary) || files[0];
         if (!primary || !primary.url || !primary.filename) throw new Error("다운로드 파일이 없습니다");
         return { url: primary.url, filename: primary.filename };
@@ -172,7 +176,9 @@ export default function ModsPage() {
         setInstalling(mod.project_id || mod.slug || mod.title || "unknown");
         setError("");
         try {
-            const { url, filename } = await resolveModrinthDownload(mod, serverType, mcVersion);
+            const loader = selectedLoader || serverType;
+            const gameVersion = selectedVersion || mcVersion;
+            const { url, filename } = await resolveModrinthDownload(mod, loader, gameVersion);
             await api.post(`/api/agent/${agentId}/mods`, { url, filename });
             alert("설치 요청 완료. 서버를 재시작하세요.");
         } catch (error: unknown) {
@@ -208,6 +214,30 @@ export default function ModsPage() {
                 <button onClick={fetchInstalled} className="flex items-center gap-1 bg-slate-800 hover:bg-slate-700 px-3 py-1 rounded text-xs">
                     <RefreshCw size={14}/>새로고침
                 </button>
+            </div>
+            <div className="flex flex-wrap gap-2 text-sm text-slate-200">
+                <label className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-2 rounded">
+                    <span>플랫폼</span>
+                    <select
+                        className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-white"
+                        value={selectedLoader || serverType}
+                        onChange={(e) => setSelectedLoader(e.target.value)}
+                    >
+                        <option value="vanilla">vanilla</option>
+                        <option value="fabric">fabric</option>
+                        <option value="paper">paper</option>
+                    </select>
+                </label>
+                <label className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-2 rounded">
+                    <span>버전</span>
+                    <input
+                        className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-white w-32"
+                        placeholder={mcVersion || "1.20.4"}
+                        value={selectedVersion}
+                        onChange={(e) => setSelectedVersion(e.target.value)}
+                    />
+                    <span className="text-xs text-slate-400">(미입력시 메타데이터 {mcVersion || "미상"})</span>
+                </label>
             </div>
             <div className="bg-slate-900 border border-slate-800 rounded p-3 space-y-2">
                 {installedMods.length === 0 ? (
