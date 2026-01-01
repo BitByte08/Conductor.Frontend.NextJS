@@ -29,7 +29,7 @@
 			// Self-reference service binding, the service name must match the worker name
 			// see https://opennext.js.org/cloudflare/caching
 			"binding": "WORKER_SELF_REFERENCE",
-			"service": "conductor-front-next"
+			"service": "conductor"
 		}
 	],
 	"observability": {
