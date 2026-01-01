@@ -16,7 +16,9 @@
 		"@opennextjs/cloudflare": "^1.14.4",
 		"next": "15.5.9",
 		"react": "19.1.4",
-		"react-dom": "19.1.4"
+		"react-dom": "19.1.4",
+		"axios": "^1.7.9",
+		"lucide-react": "^0.469.0"
 	},
 	"devDependencies": {
 		"@eslint/eslintrc": "^3",
