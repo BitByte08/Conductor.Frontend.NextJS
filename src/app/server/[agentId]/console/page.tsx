@@ -44,7 +44,10 @@ export default function ConsolePage() {
                     <div className="text-slate-500">Waiting for logs...</div>
                 ) : (
                     messages.map((m, idx) => {
-                        if (m.type === "LOG") return <div key={idx}>{m.payload?.line}</div>;
+                        if (m.type === "LOG") {
+                            const line = typeof m.payload === "object" && m.payload !== null && "line" in m.payload ? (m.payload as { line?: string }).line : "";
+                            return <div key={idx}>{line}</div>;
+                        }
                         if (m.type === "RAW") return <div key={idx} className="text-slate-400">{m.raw}</div>;
                         return <div key={idx} className="text-indigo-300">{JSON.stringify(m)}</div>;
                     })

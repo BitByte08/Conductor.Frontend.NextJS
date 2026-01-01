@@ -17,7 +17,7 @@ export default function RegisterPage() {
             const { data } = await api.post("/auth/register", { username, password });
             setToken(data.access_token);
             router.push("/dashboard");
-        } catch (err) {
+        } catch {
             alert("회원가입 실패");
         }
     };

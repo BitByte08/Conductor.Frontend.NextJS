@@ -4,14 +4,21 @@ import { useEffect, useState } from "react";
 import api from "../../lib/axios";
 import { useAuth } from "../../contexts/AuthContext";
 
+type Agent = {
+    id: string;
+    name?: string;
+    status?: string;
+    server_status?: string;
+};
+
 export default function DashboardPage() {
     const { token } = useAuth();
-    const [agents, setAgents] = useState<any[]>([]);
+    const [agents, setAgents] = useState<Agent[]>([]);
     const [name, setName] = useState("");
 
     useEffect(() => {
         if (!token) return;
-        api.get("/api/agents").then((res) => setAgents(res.data || [])).catch(() => {});
+        api.get<Agent[]>("/api/agents").then((res) => setAgents(res.data || [])).catch(() => {});
     }, [token]);
 
     const createAgent = async (e: React.FormEvent) => {

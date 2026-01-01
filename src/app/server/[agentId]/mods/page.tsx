@@ -1,40 +1,58 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import api from "../../../../lib/axios";
 import { Download, Loader2, RefreshCw } from "lucide-react";
 import { useAgentSocket } from "../../../../hooks/useAgentSocket";
 
+type ModSearchHit = {
+    project_id?: string;
+    projectId?: string;
+    id?: string;
+    slug?: string;
+    title?: string;
+    description?: string;
+    latest_version?: string;
+    latestVersion?: string;
+    versions?: string[];
+};
+
 export default function ModsPage() {
     const { agentId } = useParams<{ agentId: string }>();
     const [query, setQuery] = useState("");
-    const [mods, setMods] = useState<any[]>([]);
+    const [mods, setMods] = useState<ModSearchHit[]>([]);
     const [searching, setSearching] = useState(false);
     const [installing, setInstalling] = useState<string | null>(null);
     const [error, setError] = useState<string>("");
     const { mods: installedMods } = useAgentSocket(agentId);
-    const fetchInstalled = async () => {
+    const fetchInstalled = useCallback(async () => {
         try {
             await api.get(`/api/agent/${agentId}/mods/list`);
-        } catch (e: any) {
-            const msg = e?.response?.data?.detail || e.message;
-            setError(msg || "모드 목록을 요청하지 못했습니다");
+        } catch (error: unknown) {
+            let msg = "모드 목록을 요청하지 못했습니다";
+            if (typeof error === "object" && error !== null && "response" in error) {
+                const resp = (error as { response?: { data?: { detail?: string } } }).response;
+                msg = resp?.data?.detail || msg;
+            } else if (error instanceof Error) {
+                msg = error.message;
+            }
+            setError(msg);
         }
-    };
+    }, [agentId]);
 
     const searchMods = async (e: React.FormEvent) => {
         e.preventDefault();
         setSearching(true);
         setError("");
         try {
-            const { data } = await api.get(`/api/mods/search?query=${encodeURIComponent(query)}`);
+            const { data } = await api.get<ModSearchHit[]>(`/api/mods/search?query=${encodeURIComponent(query)}`);
             setMods(data || []);
         } finally {
             setSearching(false);
         }
     };
 
-    const resolveModrinthDownload = async (mod: any) => {
+    const resolveModrinthDownload = async (mod: ModSearchHit) => {
         const projectId = mod.project_id || mod.projectId || mod.id || mod.slug;
         if (!projectId) throw new Error("프로젝트 ID를 찾을 수 없습니다");
 
@@ -46,30 +64,39 @@ export default function ModsPage() {
         if (!versionId) {
             const projectResp = await fetch(`https://api.modrinth.com/v2/project/${projectId}`);
             if (!projectResp.ok) throw new Error("프로젝트 정보를 불러오지 못했습니다");
-            const projectData = await projectResp.json();
-            versionId = projectData.latest_version || (projectData.versions && projectData.versions[0]);
+            const projectData = await projectResp.json() as unknown;
+            if (typeof projectData === "object" && projectData !== null) {
+                const pd = projectData as { latest_version?: string; versions?: string[] };
+                versionId = pd.latest_version || (pd.versions && pd.versions[0]);
+            }
         }
         if (!versionId) throw new Error("버전 정보를 찾을 수 없습니다");
 
         // Step 2: get version files
         const versionResp = await fetch(`https://api.modrinth.com/v2/version/${versionId}`);
         if (!versionResp.ok) throw new Error("버전 정보를 불러오지 못했습니다");
-        const versionData = await versionResp.json();
-        const files = versionData.files || [];
-        const primary = files.find((f: any) => f.primary) || files[0];
-        if (!primary) throw new Error("다운로드 파일이 없습니다");
+        const versionData = await versionResp.json() as unknown;
+        const files = (typeof versionData === "object" && versionData !== null && "files" in versionData ? (versionData as { files?: Array<{ primary?: boolean; url?: string; filename?: string }> }).files : []) || [];
+        const primary = files.find((f) => f?.primary) || files[0];
+        if (!primary || !primary.url || !primary.filename) throw new Error("다운로드 파일이 없습니다");
         return { url: primary.url, filename: primary.filename };
     };
 
-    const installMod = async (mod: any) => {
-        setInstalling(mod.project_id || mod.slug || mod.title);
+    const installMod = async (mod: ModSearchHit) => {
+        setInstalling(mod.project_id || mod.slug || mod.title || "unknown");
         setError("");
         try {
             const { url, filename } = await resolveModrinthDownload(mod);
             await api.post(`/api/agent/${agentId}/mods`, { url, filename });
             alert("설치 요청 완료. 서버를 재시작하세요.");
-        } catch (e: any) {
-            const msg = e?.response?.data?.detail || e.message || "설치 실패";
+        } catch (error: unknown) {
+            let msg = "설치 실패";
+            if (typeof error === "object" && error !== null && "response" in error) {
+                const resp = (error as { response?: { data?: { detail?: string } } }).response;
+                msg = resp?.data?.detail || msg;
+            } else if (error instanceof Error) {
+                msg = error.message;
+            }
             setError(msg);
             alert("설치 실패: " + msg);
         } finally {
@@ -79,7 +106,7 @@ export default function ModsPage() {
 
     useEffect(() => {
         fetchInstalled();
-    }, []);
+    }, [fetchInstalled]);
 
     return (
         <div className="min-h-screen bg-slate-950 text-white p-6 flex flex-col gap-4">
@@ -109,7 +136,7 @@ export default function ModsPage() {
 
             <div className="grid gap-3 md:grid-cols-2">
                 {mods.map((m) => (
-                    <div key={m.project_id || m.slug} className="bg-slate-900 border border-slate-800 rounded p-3">
+                    <div key={m.project_id || m.slug || m.id} className="bg-slate-900 border border-slate-800 rounded p-3">
                         <div className="font-semibold">{m.title || m.slug}</div>
                         <div className="text-sm text-slate-400">{m.description}</div>
                         <button

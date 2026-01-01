@@ -20,13 +20,13 @@ export default function ServerDetailPage() {
     useEffect(() => {
         const fetchInfo = async () => {
             try {
-                const { data } = await api.get("/api/agents");
-                const found = (data || []).find((a: any) => a.id === agentId);
+                const { data } = await api.get<Array<{ id: string; server_status?: string; status?: string; metadata?: string }>>("/api/agents");
+                const found = (data || []).find((a) => a.id === agentId);
                 if (found) {
                     setInitialStatus(found.server_status || found.status || "UNKNOWN");
                     setInitialMetadata(found.metadata || "Unknown");
                 }
-            } catch (e) {
+            } catch {
                 // ignore
             }
         };

@@ -22,7 +22,7 @@ export default function LoginPage() {
             });
             setToken(data.access_token);
             router.push("/dashboard");
-        } catch (err) {
+        } catch {
             alert("로그인 실패");
         }
     };

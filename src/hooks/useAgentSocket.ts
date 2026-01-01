@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 type Message = {
     type: string;
-    payload?: any;
+    payload?: unknown;
     raw?: string;
 };
 
@@ -54,7 +54,7 @@ export const useAgentSocket = (agentId: string) => {
                 } else {
                     setMessages((prev) => [...prev.slice(-99), data]);
                 }
-            } catch (e) {
+            } catch {
                 setMessages((prev) => [...prev.slice(-99), { type: "RAW", raw: event.data }]);
             }
         };
