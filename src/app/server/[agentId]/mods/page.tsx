@@ -61,7 +61,7 @@ export default function ModsPage() {
         try {
             await api.post(`/api/agent/${agentId}/mods/toggle`, { filename: entry.name, enabled: nextEnabled });
             await fetchInstalled();
-        } catch (error: unknown) {
+        } catch {
             setError("토글 실패");
         } finally {
             setUpdating(null);
@@ -75,11 +75,17 @@ export default function ModsPage() {
         try {
             await api.post(`/api/agent/${agentId}/mods/delete`, { filename: entry.name });
             await fetchInstalled();
-        } catch (error: unknown) {
+        } catch {
             setError("삭제 실패");
         } finally {
             setUpdating(null);
         }
+    };
+
+    type ModrinthVersionInfo = {
+        loaders?: string[];
+        game_versions?: string[];
+        files?: Array<{ primary?: boolean; url?: string; filename?: string }>;
     };
 
     const searchMods = async (e: React.FormEvent) => {
@@ -130,13 +136,13 @@ export default function ModsPage() {
             return true;
         });
 
-        const fetchVersionData = async (versionId: string) => {
+        const fetchVersionData = async (versionId: string): Promise<ModrinthVersionInfo> => {
             const versionResp = await fetch(`https://api.modrinth.com/v2/version/${versionId}`);
             if (!versionResp.ok) throw new Error("버전 정보를 불러오지 못했습니다");
-            return versionResp.json() as unknown;
+            return versionResp.json() as Promise<ModrinthVersionInfo>;
         };
 
-        const versionMatches = (data: any) => {
+        const versionMatches = (data: ModrinthVersionInfo) => {
             const loaders = Array.isArray(data?.loaders) ? data.loaders : [];
             const games = Array.isArray(data?.game_versions) ? data.game_versions : [];
             const loaderOk = loaderCandidates.length === 0 || loaders.some((l: string) => loaderCandidates.includes(l));
@@ -144,19 +150,19 @@ export default function ModsPage() {
             return loaderOk && versionOk;
         };
 
-        let chosen: { files?: Array<{ primary?: boolean; url?: string; filename?: string }> } | null = null;
+        let chosen: ModrinthVersionInfo | null = null;
         for (const vid of orderedIds) {
             const data = await fetchVersionData(vid);
             if (versionMatches(data)) {
-                chosen = data as { files?: Array<{ primary?: boolean; url?: string; filename?: string }> };
+                chosen = data;
                 break;
             }
             if (!chosen) {
-                chosen = data as { files?: Array<{ primary?: boolean; url?: string; filename?: string }> };
+                chosen = data;
             }
         }
 
-        const files = (chosen?.files || []) as Array<{ primary?: boolean; url?: string; filename?: string }>;
+        const files = chosen?.files || [];
         const primary = files.find((f) => f?.primary) || files[0];
         if (!primary || !primary.url || !primary.filename) throw new Error("다운로드 파일이 없습니다");
         return { url: primary.url, filename: primary.filename };
