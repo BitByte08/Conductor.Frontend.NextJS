@@ -1,9 +1,9 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import api from "../../../../lib/axios";
-import { Download, Loader2, RefreshCw } from "lucide-react";
-import { useAgentSocket } from "../../../../hooks/useAgentSocket";
+import { Download, Loader2, RefreshCw, Trash2, Power } from "lucide-react";
+import { useAgentSocket, ModEntry } from "../../../../hooks/useAgentSocket";
 
 type ModSearchHit = {
     project_id?: string;
@@ -24,7 +24,17 @@ export default function ModsPage() {
     const [searching, setSearching] = useState(false);
     const [installing, setInstalling] = useState<string | null>(null);
     const [error, setError] = useState<string>("");
-    const { mods: installedMods } = useAgentSocket(agentId);
+    const { mods: installedMods, metadata } = useAgentSocket(agentId);
+    const [updating, setUpdating] = useState<string | null>(null);
+
+    const serverType = useMemo(() => {
+        const meta = (metadata || "").toLowerCase();
+        if (meta.includes("fabric")) return "fabric";
+        if (meta.includes("paper")) return "paper";
+        return "vanilla";
+    }, [metadata]);
+
+    const label = serverType === "paper" ? "플러그인" : "모드";
     const fetchInstalled = useCallback(async () => {
         try {
             await api.get(`/api/agent/${agentId}/mods/list`);
@@ -39,6 +49,33 @@ export default function ModsPage() {
             setError(msg);
         }
     }, [agentId]);
+
+    const toggleMod = async (entry: ModEntry, nextEnabled: boolean) => {
+        setUpdating(entry.name);
+        setError("");
+        try {
+            await api.post(`/api/agent/${agentId}/mods/toggle`, { filename: entry.name, enabled: nextEnabled });
+            await fetchInstalled();
+        } catch (err: unknown) {
+            setError("토글 실패");
+        } finally {
+            setUpdating(null);
+        }
+    };
+
+    const deleteMod = async (entry: ModEntry) => {
+        if (!confirm(`${entry.name}을(를) 삭제할까요?`)) return;
+        setUpdating(entry.name);
+        setError("");
+        try {
+            await api.post(`/api/agent/${agentId}/mods/delete`, { filename: entry.name });
+            await fetchInstalled();
+        } catch (err: unknown) {
+            setError("삭제 실패");
+        } finally {
+            setUpdating(null);
+        }
+    };
 
     const searchMods = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -110,20 +147,47 @@ export default function ModsPage() {
 
     return (
         <div className="min-h-screen bg-slate-950 text-white p-6 flex flex-col gap-4">
-            <h1 className="text-xl font-semibold">모드 설치 ({agentId})</h1>
+            <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                    <h1 className="text-xl font-semibold">{label} 설치 ({agentId})</h1>
+                    <div className="text-sm text-slate-400">서버 유형: {serverType}</div>
+                </div>
+                <button onClick={() => window.history.back()} className="text-sm text-slate-400 hover:text-white">뒤로가기</button>
+            </div>
             <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
-                <span className="font-semibold">적용된 모드</span>
+                <span className="font-semibold">적용된 {label}</span>
                 <button onClick={fetchInstalled} className="flex items-center gap-1 bg-slate-800 hover:bg-slate-700 px-3 py-1 rounded text-xs">
                     <RefreshCw size={14}/>새로고침
                 </button>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded p-3">
+            <div className="bg-slate-900 border border-slate-800 rounded p-3 space-y-2">
                 {installedMods.length === 0 ? (
-                    <div className="text-sm text-slate-500">모드 없음 또는 에이전트 미연결</div>
+                    <div className="text-sm text-slate-500">{label} 없음 또는 에이전트 미연결</div>
                 ) : (
-                    <ul className="list-disc list-inside text-sm text-slate-200 space-y-1">
-                        {installedMods.map((m) => <li key={m}>{m}</li>)}
-                    </ul>
+                    installedMods.map((m) => (
+                        <div key={m.name} className="flex items-center justify-between text-sm bg-slate-800/60 px-3 py-2 rounded border border-slate-700">
+                            <div>
+                                <div className="font-medium">{m.name}</div>
+                                <div className="text-xs text-slate-400">{m.enabled ? "활성" : "비활성 (.disabled)"}</div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => toggleMod(m, !m.enabled)}
+                                    disabled={updating === m.name}
+                                    className={`px-3 py-1 rounded text-xs flex items-center gap-1 ${m.enabled ? "bg-amber-600" : "bg-emerald-600"} disabled:opacity-60`}
+                                >
+                                    <Power size={14} />{m.enabled ? "비활성" : "활성"}
+                                </button>
+                                <button
+                                    onClick={() => deleteMod(m)}
+                                    disabled={updating === m.name}
+                                    className="px-3 py-1 rounded text-xs bg-red-600 hover:bg-red-500 disabled:opacity-60 flex items-center gap-1"
+                                >
+                                    <Trash2 size={14}/>삭제
+                                </button>
+                            </div>
+                        </div>
+                    ))
                 )}
             </div>
             <form onSubmit={searchMods} className="flex gap-2">

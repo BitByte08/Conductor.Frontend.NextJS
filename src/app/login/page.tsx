@@ -1,15 +1,21 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import api from "../../lib/axios";
 import { useAuth } from "../../contexts/AuthContext";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
-    const { setToken } = useAuth();
+    const { token, setToken } = useAuth();
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const router = useRouter();
+
+    useEffect(() => {
+        if (token) {
+            router.replace("/dashboard");
+        }
+    }, [router, token]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -30,7 +36,10 @@ export default function LoginPage() {
     return (
         <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
             <form onSubmit={handleLogin} className="bg-slate-900 p-8 rounded-lg w-full max-w-sm flex flex-col gap-4">
-                <h1 className="text-xl font-semibold">로그인</h1>
+                <div className="flex items-center justify-between">
+                    <h1 className="text-xl font-semibold">로그인</h1>
+                    <button type="button" onClick={() => router.back()} className="text-sm text-slate-400 hover:text-white">뒤로가기</button>
+                </div>
                 <input className="px-3 py-2 rounded bg-slate-800" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
                 <input className="px-3 py-2 rounded bg-slate-800" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
                 <button className="bg-blue-600 hover:bg-blue-500 py-2 rounded font-medium" type="submit">로그인</button>

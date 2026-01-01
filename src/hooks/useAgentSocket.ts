@@ -7,6 +7,11 @@ type Message = {
     raw?: string;
 };
 
+export type ModEntry = {
+    name: string;
+    enabled: boolean;
+};
+
 export const useAgentSocket = (agentId: string) => {
     const ws = useRef<WebSocket | null>(null);
     const [status, setStatus] = useState<string>("DISCONNECTED");
@@ -19,7 +24,7 @@ export const useAgentSocket = (agentId: string) => {
     const [ramTotal, setRamTotal] = useState<number>(0);
     const [configRam, setConfigRam] = useState<string>("");
     const [properties, setProperties] = useState<Record<string, string>>({});
-    const [mods, setMods] = useState<string[]>([]);
+    const [mods, setMods] = useState<ModEntry[]>([]);
 
     useEffect(() => {
         const apiBase = (process.env.NEXT_PUBLIC_API_BASE as string) || "https://conductor.bitworkspace.kr";
@@ -50,7 +55,20 @@ export const useAgentSocket = (agentId: string) => {
                     setProperties(data.payload || {});
                 } else if (data.type === "MODS") {
                     const files = data.payload?.files || [];
-                    setMods(Array.isArray(files) ? files : []);
+                    if (Array.isArray(files)) {
+                        setMods(files.map((f: unknown) => {
+                            if (typeof f === "string") {
+                                return { name: f, enabled: !f.endsWith(".disabled") } as ModEntry;
+                            }
+                            if (typeof f === "object" && f !== null && "name" in f) {
+                                const obj = f as { name?: unknown; enabled?: unknown };
+                                const name = typeof obj.name === "string" ? obj.name : "unknown";
+                                const enabled = typeof obj.enabled === "boolean" ? obj.enabled : !name.endsWith(".disabled");
+                                return { name, enabled } as ModEntry;
+                            }
+                            return { name: "unknown", enabled: true } as ModEntry;
+                        }));
+                    }
                 } else {
                     setMessages((prev) => [...prev.slice(-99), data]);
                 }
