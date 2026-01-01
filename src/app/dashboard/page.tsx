@@ -17,8 +17,6 @@ export default function DashboardPage() {
     const [agents, setAgents] = useState<Agent[]>([]);
     const [name, setName] = useState("");
     const [showCreate, setShowCreate] = useState(false);
-    const [serverType, setServerType] = useState("vanilla");
-    const [version, setVersion] = useState("");
     const router = useRouter();
 
     useEffect(() => {
@@ -28,16 +26,10 @@ export default function DashboardPage() {
 
     const createAgent = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!name.trim() || !version.trim()) return;
+        if (!name.trim()) return;
         const { data } = await api.post("/api/agents/create", { name: name.trim() });
         setAgents((prev) => [...prev, data]);
-        try {
-            await api.post(`/api/agent/${data.id}/install`, { type: serverType, version: version.trim() });
-        } catch (err) {
-            console.error(err);
-        }
         setName("");
-        setVersion("");
         setShowCreate(false);
     };
 
@@ -73,21 +65,7 @@ export default function DashboardPage() {
                                 <label className="text-sm text-slate-400">서버 이름</label>
                                 <input className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-700" placeholder="예: 내 서버" value={name} onChange={(e) => setName(e.target.value)} />
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                    <label className="text-sm text-slate-400">유형</label>
-                                    <select className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-700" value={serverType} onChange={(e) => setServerType(e.target.value)}>
-                                        <option value="vanilla">Vanilla</option>
-                                        <option value="paper">Paper</option>
-                                        <option value="fabric">Fabric</option>
-                                    </select>
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-sm text-slate-400">버전</label>
-                                    <input className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-700" placeholder="예: 1.20.4" value={version} onChange={(e) => setVersion(e.target.value)} />
-                                </div>
-                            </div>
-                            <div className="text-xs text-slate-500">생성 후 자동으로 선택한 유형/버전으로 설치를 시작합니다.</div>
+                            <div className="text-xs text-slate-500">생성 후 서버 상세 페이지에서 유형/버전을 선택해 설치하세요.</div>
                             <div className="flex justify-end gap-2">
                                 <button type="button" onClick={() => setShowCreate(false)} className="px-4 py-2 rounded bg-slate-800">취소</button>
                                 <button type="submit" className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500">생성</button>

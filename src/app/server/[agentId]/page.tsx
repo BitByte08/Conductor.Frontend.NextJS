@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api from "../../../lib/axios";
 import { useAgentSocket } from "../../../hooks/useAgentSocket";
 
@@ -11,6 +11,9 @@ export default function ServerDetailPage() {
     const [initialStatus, setInitialStatus] = useState<string>("UNKNOWN");
     const [initialMetadata, setInitialMetadata] = useState<string>("Unknown");
     const [actionMsg, setActionMsg] = useState<string>("");
+    const [installType, setInstallType] = useState("vanilla");
+    const [installVersion, setInstallVersion] = useState("");
+    const [installing, setInstalling] = useState(false);
 
     useEffect(() => {
         const fetchInfo = async () => {
@@ -30,6 +33,8 @@ export default function ServerDetailPage() {
 
     const displayStatus = serverStatus && serverStatus !== "UNKNOWN" ? serverStatus : initialStatus;
     const displayMetadata = metadata || initialMetadata;
+    const notInstalled = !displayMetadata || displayMetadata.toLowerCase().includes("unknown");
+    const agentOnline = agentStatus === "ONLINE";
 
     const ramUsageGb = useMemo(() => ((ramUsage || 0) / (1024 * 1024 * 1024)).toFixed(2), [ramUsage]);
     const ramTotalGb = useMemo(() => ((ramTotal || 0) / (1024 * 1024 * 1024)).toFixed(2), [ramTotal]);
@@ -41,8 +46,30 @@ export default function ServerDetailPage() {
     }, [ramUsage, ramTotal]);
 
     const doAction = async (action: "start" | "stop") => {
+        if (!agentOnline) {
+            setActionMsg("에이전트가 오프라인입니다.");
+            return;
+        }
         await api.post(`/api/agent/${agentId}/${action}`);
         setActionMsg(action === "start" ? "서버 시작 명령을 보냈습니다." : "서버 정지 명령을 보냈습니다.");
+    };
+
+    const requestInstall = async () => {
+        if (!installVersion.trim()) {
+            setActionMsg("버전을 입력하세요.");
+            return;
+        }
+        if (!agentOnline) {
+            setActionMsg("에이전트가 오프라인입니다.");
+            return;
+        }
+        setInstalling(true);
+        try {
+            await api.post(`/api/agent/${agentId}/install`, { type: installType, version: installVersion.trim() });
+            setActionMsg("설치 요청을 보냈습니다. 에이전트 로그를 확인하세요.");
+        } finally {
+            setInstalling(false);
+        }
     };
 
     return (
@@ -63,6 +90,7 @@ export default function ServerDetailPage() {
                 <div className="bg-slate-900 border border-slate-800 rounded p-4">
                     <div className="text-slate-400 text-sm">에이전트 연결</div>
                     <div className="text-lg font-semibold">{agentStatus} / {wsStatus}</div>
+                    {!agentOnline && <div className="text-xs text-amber-400 mt-2">에이전트가 연결되어야 시작/설치가 가능합니다.</div>}
                 </div>
                 <div className="bg-slate-900 border border-slate-800 rounded p-4">
                     <div className="text-slate-400 text-sm">서버 상태</div>
@@ -107,13 +135,41 @@ export default function ServerDetailPage() {
                             <div className="text-lg font-semibold">현재: {displayStatus}</div>
                         </div>
                         <div className="flex gap-2">
-                            <button onClick={() => doAction("start")} className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded text-sm">시작</button>
-                            <button onClick={() => doAction("stop")} className="bg-red-600 hover:bg-red-500 px-4 py-2 rounded text-sm">정지</button>
+                            <button onClick={() => doAction("start")} disabled={!agentOnline} className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded text-sm disabled:opacity-60">시작</button>
+                            <button onClick={() => doAction("stop")} disabled={!agentOnline} className="bg-red-600 hover:bg-red-500 px-4 py-2 rounded text-sm disabled:opacity-60">정지</button>
                         </div>
                     </div>
                     <div className="text-sm text-slate-400">콘솔 탭에서 로그를 확인할 수 있습니다. 세부 설정은 설정 탭에서 관리하세요.</div>
                 </div>
             </div>
+
+            {notInstalled && (
+                <div className="bg-slate-900 border border-amber-700 rounded p-4 mt-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <div className="text-amber-300 text-sm">서버가 설치되지 않았습니다.</div>
+                            <div className="text-xs text-amber-200/80">유형과 버전을 선택해 설치를 진행하세요.</div>
+                        </div>
+                        {!agentOnline && <span className="text-xs text-red-300">에이전트 연결 필요</span>}
+                    </div>
+                    <div className="grid md:grid-cols-3 gap-3 items-end">
+                        <div className="space-y-1">
+                            <label className="text-sm text-slate-300">유형</label>
+                            <select className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-700" value={installType} onChange={(e) => setInstallType(e.target.value)}>
+                                <option value="vanilla">Vanilla</option>
+                                <option value="paper">Paper</option>
+                                <option value="fabric">Fabric</option>
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-sm text-slate-300">버전</label>
+                            <input className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-700" placeholder="예: 1.20.4" value={installVersion} onChange={(e) => setInstallVersion(e.target.value)} />
+                        </div>
+                        <button onClick={requestInstall} disabled={installing || !agentOnline} className="px-4 py-3 rounded bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-sm">설치 요청</button>
+                    </div>
+                    <div className="text-xs text-slate-400">설치 요청은 에이전트가 온라인일 때 전송됩니다.</div>
+                </div>
+            )}
 
             {actionMsg && <div className="mt-3 text-sm text-emerald-400">{actionMsg}</div>}
         </div>
